@@ -10,8 +10,9 @@ Recreates the two-stage LLM pipeline from the uploaded notebook:
 Run with:
     streamlit run app.py
 
-Requires a Google API key for Gemini (GOOGLE_API_KEY), either in a .env
-file in the same folder or entered in the sidebar at runtime.
+Requires a Google API key for Gemini, set as the GOOGLE_API_KEY environment
+variable (in a local .env file, or as a Railway/host environment variable
+in production). The key is never shown or editable in the UI.
 """
 
 import os
@@ -23,32 +24,23 @@ load_dotenv()
 # ----------------------------------------------------------------------
 # Page setup
 # ----------------------------------------------------------------------
-st.set_page_config(page_title="Blood Work Analyzer",
-                   page_icon="🩸", layout="wide")
+st.set_page_config(page_title="Blood Work Analyzer", page_icon="🩸", layout="wide")
 st.title("🩸 Blood Work Analysis")
-st.caption(
-    "Upload or paste a blood report to get extracted values, a health summary, and a diet plan.")
+st.caption("Upload or paste a blood report to get extracted values, a health summary, and a diet plan.")
 
 # ----------------------------------------------------------------------
-# Sidebar: API key + model settings
+# Sidebar: model settings only — no API key field. The key is read purely
+# from the environment (GOOGLE_API_KEY), so it's never displayed, editable,
+# or shared across users/devices.
 # ----------------------------------------------------------------------
 with st.sidebar:
     st.header("Settings")
-    api_key_input = st.text_input(
-        "Google API Key",
-        value=os.getenv("GOOGLE_API_KEY", ""),
-        type="password",
-        help="Falls back to GOOGLE_API_KEY in your .env file if left blank.",
-    )
     model_name = st.text_input("Gemini model", value="gemini-3.6-flash")
     st.divider()
     st.markdown(
         "**Disclaimer:** This tool is for informational purposes only and "
         "is not a substitute for professional medical advice."
     )
-
-if api_key_input:
-    os.environ["GOOGLE_API_KEY"] = api_key_input
 
 
 @st.cache_resource(show_spinner=False)
@@ -78,8 +70,7 @@ with tab_paste:
     if pasted.strip():
         blood_report = pasted
 
-run_button = st.button("Run analysis", type="primary",
-                       disabled=not blood_report.strip())
+run_button = st.button("Run analysis", type="primary", disabled=not blood_report.strip())
 
 # ----------------------------------------------------------------------
 # Prompts (kept close to the original notebook)
@@ -114,7 +105,9 @@ Blood Work Analysis:
 if run_button:
     if not os.getenv("GOOGLE_API_KEY"):
         st.error(
-            "Please provide a Google API key in the sidebar (or set GOOGLE_API_KEY in a .env file).")
+            "GOOGLE_API_KEY is not set. Add it as an environment variable "
+            "(a .env file locally, or a Railway/host variable in production)."
+        )
         st.stop()
 
     try:
@@ -126,10 +119,8 @@ if run_button:
     st.subheader("2. Extracted values")
     with st.spinner("Extracting and classifying test values..."):
         try:
-            extraction_response = llm.invoke(
-                EXTRACTION_PROMPT_TEMPLATE.format(report=blood_report))
-            extracted_values = extraction_response.content if hasattr(
-                extraction_response, "content") else str(extraction_response)
+            extraction_response = llm.invoke(EXTRACTION_PROMPT_TEMPLATE.format(report=blood_report))
+            extracted_values = extraction_response.content if hasattr(extraction_response, "content") else str(extraction_response)
         except Exception as e:
             st.error(f"Extraction step failed: {e}")
             st.stop()
@@ -139,10 +130,8 @@ if run_button:
     st.subheader("3. Health summary & diet plan")
     with st.spinner("Generating health summary and diet plan..."):
         try:
-            diet_response = llm.invoke(
-                DIET_PROMPT_TEMPLATE.format(analysis=extracted_values))
-            diet_plan = diet_response.content if hasattr(
-                diet_response, "content") else str(diet_response)
+            diet_response = llm.invoke(DIET_PROMPT_TEMPLATE.format(analysis=extracted_values))
+            diet_plan = diet_response.content if hasattr(diet_response, "content") else str(diet_response)
         except Exception as e:
             st.error(f"Diet plan step failed: {e}")
             st.stop()
