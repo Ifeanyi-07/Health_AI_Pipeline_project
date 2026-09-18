@@ -1,0 +1,6 @@
+.env
+.venv
+.ipynb_checkpoints
+blood_work.txt
+pyproject.toml
+blood_work_analysis.ipynb
